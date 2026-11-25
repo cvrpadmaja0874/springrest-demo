@@ -1,0 +1,143 @@
+
+================================================================================
+SPRING BOOT REST API (PRODUCT & COUPON) + SWAGGER + GITHUB + DOCKER LAB GUIDE
+================================================================================
+
+1. CREATE SPRING BOOT PROJECT IN STS (SPRING TOOL SUITE)
+--------------------------------------------------------------------------------
+- Open STS on Ubuntu VM.
+- Go to: File -> New -> Spring Starter Project
+- Name: springrest-demo
+- Dependencies selected: Spring Web
+- Change default port (since 8080 was in use) in src/main/resources/application.properties:
+    server.port=8081
+
+
+2. CREATE MODELS & REST CONTROLLER
+--------------------------------------------------------------------------------
+A) Coupon.java (Model)
+   - Fields: String code, double discount (with constructors, getters, setters)
+
+B) Product.java (Model)
+   - Fields: int id, String name, double price, String couponCode (with constructors, getters, setters)
+
+C) StoreController.java (@RestController, @RequestMapping("/api"))
+   - POST /api/coupons        -> Creates and stores a Coupon in memory
+   - GET  /api/coupons/{code} -> Fetches a Coupon by code
+   - POST /api/products       -> Creates a Product and applies percentage discount if couponCode matches
+   - GET  /api/products       -> Returns all Products
+
+
+3. ADD SWAGGER (OPENAPI) FOR API TESTING
+--------------------------------------------------------------------------------
+- Add dependency to pom.xml inside <dependencies>:
+    <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>2.8.5</version>
+    </dependency>
+- Run application in STS: Right-click project -> Run As -> Spring Boot App
+- Open Swagger UI in Ubuntu browser:
+    http://localhost:8081/swagger-ui/index.html
+
+
+4. SAMPLE JSON PAYLOADS FOR SWAGGER TESTING
+--------------------------------------------------------------------------------
+A) Add Coupons first (POST /api/coupons):
+    { "code": "SAVE20", "discount": 20.0 }
+    { "code": "WELCOME10", "discount": 10.0 }
+    { "code": "MEGA50", "discount": 50.0 }
+    { "code": "FESTIVE15", "discount": 15.0 }
+    { "code": "STUDENT25", "discount": 25.0 }
+
+B) Add Products next (POST /api/products):
+    { "id": 1, "name": "Dell XPS 15 Laptop", "price": 1200.0, "couponCode": "SAVE20" }
+    { "id": 2, "name": "Apple iPhone 16", "price": 900.0, "couponCode": "WELCOME10" }
+    { "id": 3, "name": "Sony WH-1000XM5 Headphones", "price": 350.0, "couponCode": "SAVE20" }
+    { "id": 4, "name": "Logitech MX Master 3S Mouse", "price": 100.0, "couponCode": null }
+    { "id": 5, "name": "Samsung 27-inch 4K Monitor", "price": 450.0, "couponCode": "WELCOME10" }
+
+
+5. PUSH SOURCE CODE TO GITHUB (VIA SSH)
+--------------------------------------------------------------------------------
+# Navigate to project directory
+cd /home/azureadmin/cicd-workspace/springrest-demo
+
+# Initialize Git and commit files
+git init
+git config user.name "cvrpadmaja0874"
+git config user.email "cvrpadmaja@gmail.com"
+git add .
+git commit -m "Product and Coupon REST API with Swagger"
+git branch -M main
+
+# Generate SSH key and copy public key to GitHub (Settings -> SSH and GPG keys -> New SSH key)
+ssh-keygen -t ed25519 -C "cvrpadmaja@gmail.com" -f ~/.ssh/id_ed25519 -N ""
+cat ~/.ssh/id_ed25519.pub
+
+# Connect to GitHub repository via SSH and push
+git remote add origin git@github.com:cvrpadmaja0874/springrest-demo.git
+git push -u origin main
+
+
+https://github.com/cvrpadmaja0874/springrest-demo/commits?author=cvrpadmaja0874
+
+6. BUILD JAR & DOCKERIZE THE APPLICATION
+--------------------------------------------------------------------------------
+# Stop STS app first (or check/kill process on port 8081)
+sudo ss -tulpn | grep 8081
+kill -9 <PID>
+
+# Package Spring Boot executable JAR
+./mvnw clean package -DskipTests
+
+# Create Dockerfile (using public ECR mirror to avoid Docker Hub anonymous pull limits)
+cat << 'EOF' > Dockerfile
+FROM public.ecr.aws/docker/library/eclipse-temurin:21-jdk-alpine
+WORKDIR /app
+COPY target/*.jar app.jar
+EXPOSE 8081
+ENTRYPOINT ["java", "-jar", "app.jar"]
+EOF
+
+# Build Docker image with custom prefix
+docker build -t cvrp_springrest-demo:1.0 .
+
+# Run Docker container on port 8081
+docker run -d -p 8081:8081 --name cvrp_rest_container cvrp_springrest-demo:1.0
+
+# Verify container & test Swagger UI
+docker ps
+# Browser URL: http://localhost:8081/swagger-ui/index.html
+
+# Push Dockerfile to GitHub
+git add Dockerfile
+git commit -m "Use public ECR mirror in Dockerfile"
+git push
+
+
+7. PUSH DOCKER IMAGE TO DOCKER HUB
+--------------------------------------------------------------------------------
+# Log in using Docker Hub Access Token (Read & Write)
+echo "<YOUR_DOCKERHUB_ACCESS_TOKEN>" | docker login -u <YOUR_DOCKERHUB_USERNAME> --password-stdin
+
+# Tag image with Docker Hub username
+docker tag cvrp_springrest-demo:1.0 <YOUR_DOCKERHUB_USERNAME>/cvrp_springrest-demo:1.0
+
+# Push image to Docker Hub
+docker push <YOUR_DOCKERHUB_USERNAME>/cvrp_springrest-demo:1.0
+
+# Logout on shared VM when finished
+docker logout
+================================================================================
+
+
+cd /home/azureadmin/cicd-workspace/springrest-demo
+nano LAB_NOTES.md
+# (Paste the guide above, then press Ctrl+O, Enter, Ctrl+X)
+
+git add LAB_NOTES.md
+git commit -m "Add complete lab setup and Docker deployment notes"
+git push
+
+

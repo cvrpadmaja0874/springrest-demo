@@ -1,0 +1,242 @@
+
+Here is your complete reference guide right in the chat so you can easily copy and save it wherever you like:
+
+Jenkins CI/CD Reference Guide (springrest-demo)
+
+
+1. Environment & URLs
+
+• VM Public IP: 3.235.244.188
+• Jenkins Dashboard: http://3.235.244.188:8080
+• GitHub Repository (Public): https://github.com
+• Docker Hub Image: cvrpadmaja0874/springrest-demo
+• Jenkins Job Name: springrest-demo-cvrp
+• Jenkins Workspace Path on VM: /var/lib/jenkins/workspace/springrest-demo-cvrp/
+• App Container Port Mapping: Host Port 8086 -> Container Port 8082
+• Swagger UI URL (on VM): http://localhost:8086/swagger-ui/index.html
+
+2. Prerequisites Configured on the VM
+
+1. Verified Docker (28.4.0) and Git (2.34.1) were installed.
+2. Granted the jenkins background user permission to run Docker commands:bash
+sudo usermod -aG docker jenkins
+sudo systemctl restart jenkins
+Use code with caution.
+
+3. Docker Hub Credentials Setup in Jenkins
+
+1. Generated a Read & Write Personal Access Token in Docker Hub (Account Settings > Security).
+2. In Jenkins, went to Manage Jenkins > Credentials > System > Global credentials > + Add Credentials:
+	• Kind: Username with password
+	• Username: cvrpadmaja0874
+	• Password: <Your Docker Hub Access Token>
+	• ID: dockerhub-cvrp (unique ID to avoid conflicts on a shared training VM)
+
+4. Working Jenkins Pipeline Script (Pipeline script mode)
+
+Configured inside springrest-demo-cvrp > Configure > Pipeline (Definition: Pipeline script):
+groovy
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "cvrpadmaja0874/springrest-demo"
+        DOCKER_CREDS = credentials('dockerhub-cvrp')
+        CONTAINER_NAME = "springrest-container-cvrp"
+    }
+
+    stages {
+        stage('Clone Public Repo') {
+            steps {
+                git branch: 'main', url: 'https://github.com'
+            }
+        }
+
+        stage('Build JAR') {
+            steps {
+                sh 'chmod +x mvnw && ./mvnw clean package -DskipTests'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} -t ${IMAGE_NAME}:latest ."
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                sh 'echo $DOCKER_CREDS_PSW | docker login -u $DOCKER_CREDS_USR --password-stdin'
+                sh "docker push ${IMAGE_NAME}:${BUILD_NUMBER}"
+                sh "docker push ${IMAGE_NAME}:latest"
+            }
+        }
+
+        stage('Deploy Container') {
+            steps {
+                sh '''
+                    docker stop ${CONTAINER_NAME} || true
+                    docker rm ${CONTAINER_NAME} || true
+                    docker run -d --name ${CONTAINER_NAME} -p 8086:8082 ${IMAGE_NAME}:latest
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker logout'
+        }
+    }
+}
+Use code with caution.
+
+5. Day-to-Day Workflow When Updating Your App
+
+1. Edit your Java code (e.g., adding products/coupons to your LinkedList).
+2. Push changes to GitHub:bash
+git add .
+git commit -m "Describe your change"
+git push
+Use code with caution.
+3. Open Jenkins -> go to springrest-demo-cvrp -> click Build Now.
+4. Verify your updated image tag on Docker Hub and test your live API via Swagger UI (http://localhost:8086/swagger-ui/index.html).
+
+6. Key Lessons & Troubleshooting Notes
+
+• lstat /target: no such file or directory: Always run ./mvnw clean package -DskipTests before docker build so the .jar file exists for the Dockerfile to copy.
+• docker login requires at most 1 argument: Put only your Docker Hub username (cvrpadmaja0874) in the Jenkins credential Username field—never a full command.
+• port is already allocated / address already in use: On a shared VM, map your container to an unused host port (like 8086:8082) instead of a port another container is already using.
+• In-memory LinkedList data: Items added via Swagger POST work while the container runs, but reset when the container restarts. Add permanent items directly in your Java code before pushing to GitHub.
+• Security cleanup: Revoke your Docker Hub Access Token on ://docker.com once your training lab ends.
+Whenever you're ready for Milestone 3: Auto-triggering builds whenever you run git push (via GitHub Webhooks or SCM Polling), just let me know!
+
+
+---------------------------------------------------------------------------------------------------------
+
+
+Complete Jenkins CI/CD Pipeline Reference (springrest-demo)
+
+
+1. Project & Environment Details
+
+• VM Public IP: 3.235.244.188
+• Jenkins Dashboard URL: http://3.235.244.188:8080
+• Jenkins Job Name: springrest-demo-cvrp
+• Jenkins Workspace on VM: /var/lib/jenkins/workspace/springrest-demo-cvrp/
+• GitHub Repository (Public): https://github.com
+• GitHub Webhook Payload URL: http://3.235.244
+• Docker Hub Image: cvrpadmaja0874/springrest-demo
+• Container Port Mapping: Host Port 8086 -> Container Port 8082
+• Swagger UI Endpoint (on VM): http://localhost:8086/swagger-ui/index.html
+
+2. VM & Jenkins Setup (One-Time Prerequisites)
+
+1. Verified Tools on VM:bash
+docker --version   # Docker 28.4.0
+git --version      # Git 2.34.1
+sudo systemctl status jenkins
+Use code with caution.
+2. Granted Jenkins Permission to Run Docker:bash
+sudo usermod -aG docker jenkins
+sudo systemctl restart jenkins
+Use code with caution.
+
+3. Docker Hub Credentials Setup in Jenkins
+
+1. Generated a Read & Write Personal Access Token in Docker Hub (Account Settings > Security).
+2. In Jenkins: Manage Jenkins > Credentials > System > Global credentials (unrestricted) > + Add Credentials:
+	• Kind: Username with password
+	• Username: cvrpadmaja0874
+	• Password: <Your Docker Hub Access Token>
+	• ID: dockerhub-cvrp
+
+4. Complete Jenkins Pipeline Script (Pipeline script)
+
+Configured inside springrest-demo-cvrp > Configure > Pipeline (Definition: Pipeline script):
+groovy
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "cvrpadmaja0874/springrest-demo"
+        DOCKER_CREDS = credentials('dockerhub-cvrp')
+        CONTAINER_NAME = "springrest-container-cvrp"
+    }
+
+    stages {
+        stage('Clone Public Repo') {
+            steps {
+                git branch: 'main', url: 'https://github.com'
+            }
+        }
+
+        stage('Build JAR') {
+            steps {
+                sh 'chmod +x mvnw && ./mvnw clean package -DskipTests'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} -t ${IMAGE_NAME}:latest ."
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                sh 'echo $DOCKER_CREDS_PSW | docker login -u $DOCKER_CREDS_USR --password-stdin'
+                sh "docker push ${IMAGE_NAME}:${BUILD_NUMBER}"
+                sh "docker push ${IMAGE_NAME}:latest"
+            }
+        }
+
+        stage('Deploy Container') {
+            steps {
+                sh '''
+                    docker stop ${CONTAINER_NAME} || true
+                    docker rm ${CONTAINER_NAME} || true
+                    docker run -d --name ${CONTAINER_NAME} -p 8086:8082 ${IMAGE_NAME}:latest
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker logout'
+        }
+    }
+}
+Use code with caution.
+
+5. Automated GitHub Webhook Trigger Setup
+
+1. In Jenkins (springrest-demo-cvrp > Configure > Triggers):
+	• Checked GitHub hook trigger for GITScm polling and clicked Save.
+2. In GitHub (cvrpadmaja0874/springrest-demo > Settings > Webhooks > Add webhook):
+	• Payload URL: http://3.235.244
+	• Content type: application/json
+	• Events: Just the push event
+	• Verified green checkmark status next to the webhook.
+
+6. Your Automated Workflow Now
+
+1. Make code changes locally (e.g., adding products/coupons to your Spring Boot app).
+2. Run:bash
+git add .
+git commit -m "Update application"
+git push
+Use code with caution.
+3. Everything else happens automatically: GitHub notifies Jenkins -> Jenkins clones the code -> builds the .jar -> builds & pushes the Docker image to Docker Hub (:BUILD_NUMBER and :latest) -> restarts your live container on port 8086.
+
+7. Key Troubleshooting & Best Practices Summary
+
+• Compile .jar before docker build: Always run ./mvnw clean package -DskipTests first so target/*.jar exists for the Dockerfile.
+• Credential Username field: Enter only your Docker Hub username (cvrpadmaja0874), never a full CLI command.
+• Port collisions on shared VMs: Map your container to a free host port (-p 8086:8082) if 8082 is already in use by another container.
+• In-memory LinkedList persistence: Items added via Swagger UI POST vanish when a container restarts; add permanent items in your Java code before pushing to GitHub.
+• Post-training cleanup: Revoke your Docker Hub Access Token in Docker Hub Account Settings > Security once your lab finishes.
+Congratulations on building a complete, automated CI/CD pipeline from scratch! Let me know if you want to test one final git push to watch the webhook trigger live, or if you have any questions about deploying this Docker Hub image to another server or Kubernetes.
+
+
